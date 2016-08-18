@@ -2,7 +2,7 @@ package consul
 
 import java.net.InetAddress
 
-import com.ning.http.client.AsyncHttpClientConfig
+import akka.actor.ActorRefFactory
 import consul.v1.acl.AclRequests
 import consul.v1.agent.AgentRequests
 import consul.v1.catalog.CatalogRequests
@@ -12,11 +12,9 @@ import consul.v1.health.HealthRequests
 import consul.v1.kv.KvRequests
 import consul.v1.session.SessionRequests
 import consul.v1.status.StatusRequests
-import play.api.Application
-import play.api.libs.ws.{WS, WSClient}
-import play.api.libs.ws.ning.NingWSClient
 
 import scala.concurrent.ExecutionContext
+import spray.client.pipelining._
 
 trait ConsulApiV1{
   def acl:     AclRequests
@@ -30,7 +28,7 @@ trait ConsulApiV1{
 
 }
 
-class Consul(address: InetAddress, port: Int = 8500, token: Option[String] = None, client: WSClient)
+class Consul(address: InetAddress, port: Int = 8500, token: Option[String] = None, client: SendReceive)
             (implicit executionContext: ExecutionContext){
 
   lazy val v1: ConsulApiV1 with Types = new ConsulApiV1 with Types{
@@ -50,13 +48,13 @@ class Consul(address: InetAddress, port: Int = 8500, token: Option[String] = Non
 
 object Consul {
   def inApplication(address: InetAddress, port: Int = 8500, token: Option[String] = None)
-                   (implicit executionContext: ExecutionContext, app: Application): Consul =
-    new Consul(address, port, token, WS.client)
+                   (implicit executionContext: ExecutionContext, arf: ActorRefFactory): Consul =
+    new Consul(address, port, token, sendReceive)
 
-  def standalone(address: InetAddress, port: Int = 8500, token: Option[String] = None)
+  /*def standalone(address: InetAddress, port: Int = 8500, token: Option[String] = None)
                 (implicit executionContext: ExecutionContext): Consul = {
     val builder = new AsyncHttpClientConfig.Builder()
     val client = new NingWSClient(builder.build())
     new Consul(address, port, token, client)
-  }
+  }*/
 }

@@ -2,10 +2,10 @@ package consul.v1.session
 
 import consul.v1.common.ConsulRequestBasics
 import consul.v1.common.Types._
-import play.api.http.Status
 import play.api.libs.json.Json
 
 import scala.concurrent.{ExecutionContext, Future}
+import spray.http.{ HttpMethods, HttpRequest, StatusCodes }
 
 trait SessionRequests {
 
@@ -32,40 +32,35 @@ object SessionRequests{
 
   def apply(basePath: String)(implicit executionContext: ExecutionContext, rb: ConsulRequestBasics): SessionRequests = new SessionRequests{
 
-    def create(sessionDef: SessionDef,dc:Option[DatacenterId]): Future[SessionIDHolder] = rb.erased(
-      rb.jsonDcRequestMaker(
+    def create(sessionDef: SessionDef,dc:Option[DatacenterId]): Future[SessionIDHolder] =
+      rb.jsonDcRequestMaker[SessionIDHolder](
         createPath,dc,
-        _.put(Json.toJson(sessionDef))
-      )(_.validate[SessionIDHolder])
-    )
+         uri => HttpRequest(HttpMethods.PUT, uri, entity = Json.stringify(Json.toJson(sessionDef)))
+      )
 
-    def node(node:NodeId,dc:Option[DatacenterId]=Option.empty):Future[Seq[SessionInfo]] = rb.erased(
-      rb.jsonDcRequestMaker(
-        fullPathFor(s"node/$node"),dc,_.get
-      )( _.validate[Seq[SessionInfo]] )
-    )
+    def node(node:NodeId,dc:Option[DatacenterId]=Option.empty):Future[Seq[SessionInfo]] =
+      rb.jsonDcRequestMaker[Seq[SessionInfo]](
+        fullPathFor(s"node/$node"),dc, uri => HttpRequest(HttpMethods.GET, uri)
+      )
 
     def destroy(id:SessionId,dc:Option[DatacenterId]):Future[Boolean] = rb.responseStatusDcRequestMaker(
-      fullPathFor(s"destroy/$id"),dc,_.put("")
-    )(_ == Status.OK)
+      fullPathFor(s"destroy/$id"),dc, uri => HttpRequest(HttpMethods.PUT, uri, entity = "")
+    )(_ == StatusCodes.OK)
 
-    def list(dc:Option[DatacenterId]):Future[Seq[SessionInfo]] = rb.erased(
-      rb.jsonDcRequestMaker(
-        listPath,dc,_.get
-      )(_.validate[Seq[SessionInfo]])
-    )
+    def list(dc:Option[DatacenterId]):Future[Seq[SessionInfo]] =
+      rb.jsonDcRequestMaker[Seq[SessionInfo]](
+        listPath,dc, uri => HttpRequest(HttpMethods.GET, uri)
+      )
 
-    def renew(id:SessionId,dc:Option[DatacenterId]=Option.empty):Future[Seq[SessionInfo]] = rb.erased(
-      rb.jsonDcRequestMaker(
-        fullPathFor(s"renew/$id"),dc,_.put("")
-      )(_.validate[Seq[SessionInfo]])
-    )
+    def renew(id:SessionId,dc:Option[DatacenterId]=Option.empty):Future[Seq[SessionInfo]] =
+      rb.jsonDcRequestMaker[Seq[SessionInfo]](
+        fullPathFor(s"renew/$id"),dc, uri => HttpRequest(HttpMethods.PUT, uri, entity = "")
+      )
 
-    def info(id:SessionId,dc:Option[DatacenterId]=Option.empty):Future[Seq[SessionInfo]] = rb.erased(
-      rb.jsonDcRequestMaker(
-        fullPathFor(s"info/$id"),dc,_.get
-      )( _.validate[Seq[SessionInfo]] )
-    )
+    def info(id:SessionId,dc:Option[DatacenterId]=Option.empty):Future[Seq[SessionInfo]] =
+      rb.jsonDcRequestMaker[Seq[SessionInfo]](
+        fullPathFor(s"info/$id"),dc, uri => HttpRequest(HttpMethods.GET, uri)
+      )
 
     private lazy val createPath = fullPathFor("create")
     private lazy val listPath = fullPathFor("list")

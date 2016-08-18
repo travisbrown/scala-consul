@@ -1,10 +1,12 @@
 package consul.v1.acl
 
 import consul.v1.common.ConsulRequestBasics
-import play.api.http.Status
-import play.api.libs.json.{JsNull, Json}
+import play.api.libs.json.{JsNull, Json, Reads}
 
 import scala.concurrent.{ExecutionContext, Future}
+import spray.http.StatusCodes
+import spray.httpx.RequestBuilding
+import spray.httpx.PlayJsonSupport._
 
 trait AclRequests {
   def create(Name:Option[String]=Option.empty,Type:Option[String]=Option.empty,Rules:Option[String]=Option.empty):Future[AclIdResponse]
@@ -25,34 +27,30 @@ object AclRequests{
 
   def apply(basePath: String)(implicit executionContext: ExecutionContext, rb: ConsulRequestBasics): AclRequests = new AclRequests{
 
-    def create(acl:AclCreate):Future[AclIdResponse] = rb.erased(
-      rb.jsonRequestMaker(createPath,_.put(Json.toJson(acl)))(_.validate[AclIdResponse])
-    )
+    def create(acl:AclCreate):Future[AclIdResponse] =
+      rb.jsonRequestMaker[AclIdResponse](createPath, uri => RequestBuilding.Put(uri, Json.toJson(acl)))
 
     def create(Name:Option[String],Type:Option[String],Rules:Option[String]):Future[AclIdResponse] = create(
       AclCreate(Name,Type,Rules)
     )
 
     def update(acl: AclUpdate): Future[Boolean] =
-      rb.responseStatusRequestMaker(updatePath,_.put(Json.toJson(acl)))(_ == Status.OK)
+      rb.responseStatusRequestMaker(updatePath, uri => RequestBuilding.Put(uri, Json.toJson(acl)))(_ == StatusCodes.OK)
 
     def update(ID:AclId,Name:Option[String],Type:Option[String],Rules:Option[String]): Future[Boolean] =
       update(AclUpdate(ID,Name,Type,Rules))
 
     def destroy(id:AclId):Future[Boolean] =
-      rb.responseStatusRequestMaker(fullPathFor(s"destroy/$id"),_.put(JsNull))(_ == Status.OK)
+      rb.responseStatusRequestMaker(fullPathFor(s"destroy/$id"), RequestBuilding.Put(_, JsNull))(_ == StatusCodes.OK)
 
-    def list():Future[Seq[AclInfo]] = rb.erased(
-      rb.jsonRequestMaker(listPath,_.get())(_.validate[Seq[AclInfo]])
-    )
+    def list():Future[Seq[AclInfo]] =
+      rb.jsonRequestMaker[Seq[AclInfo]](listPath, RequestBuilding.Get(_))
 
-    def info(id:AclId): Future[Option[AclInfo]] = rb.erased(
-      rb.jsonRequestMaker(fullPathFor(s"info/$id"),_.get())(_.validateOpt[AclInfo])
-    )
+    def info(id:AclId): Future[Option[AclInfo]] =
+      rb.jsonRequestMaker(fullPathFor(s"info/$id"), RequestBuilding.Get(_))(Reads.optionWithNull[AclInfo], executionContext)
 
-    def clone(id:AclId): Future[AclIdResponse] = rb.erased(
-      rb.jsonRequestMaker(fullPathFor(s"clone/$id"),_.put(JsNull))(_.validate[AclIdResponse])
-    )
+    def clone(id:AclId): Future[AclIdResponse] =
+      rb.jsonRequestMaker[AclIdResponse](fullPathFor(s"clone/$id"), RequestBuilding.Put(_, JsNull))
 
     private lazy val createPath = fullPathFor("create")
     private lazy val updatePath = fullPathFor("update")

@@ -1,38 +1,29 @@
 package consul.v1.common
 
-import com.ning.http.client.AsyncHttpClientConfig
 import consul.v1.common.Types.DatacenterId
 import play.api.libs.json._
-import play.api.libs.ws.{WS, WSClient, WSRequest, WSResponse}
-import play.api.libs.ws.ning.NingWSClient
-import play.api.Application
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success, Try}
+import spray.client.pipelining._
+import spray.http.{ HttpRequest, HttpResponse, StatusCode, Uri }
+import spray.httpx.PlayJsonSupport._
 
-class ConsulRequestBasics(token: Option[String], client: WSClient) {
-  def this(token: Option[String])(implicit app: Application) = this(token, WS.client)
+class ConsulRequestBasics(token: Option[String], client: SendReceive) {
+  type HttpFunc = Uri => HttpRequest
 
-  type HttpFunc = WSRequest => Future[WSResponse]
-  type RequestTransformer = WSRequest => WSRequest
-
-  def jsonRequestMaker[A](path: String, httpFunc: HttpFunc)(body: JsValue => A)(implicit executionContext: ExecutionContext): Future[A] = {
-    genRequestMaker(path,httpFunc)(_.json)(body)
+  def jsonRequestMaker[A: Reads](path: String, httpFunc: HttpFunc)(implicit executionContext: ExecutionContext): Future[A] = {
+    genRequestMaker(path,httpFunc)(unmarshal[A].apply)
   }
 
-  def jsonDcRequestMaker[A](path: String, dc:Option[DatacenterId], httpFunc: HttpFunc)(body: JsValue => A)(implicit executionContext: ExecutionContext): Future[A] = {
-    jsonRequestMaker(path, withDc(dc).andThen(httpFunc))(body)
+  def jsonDcRequestMaker[A: Reads](path: String, dc:Option[DatacenterId], httpFunc: HttpFunc)(implicit executionContext: ExecutionContext): Future[A] = {
+    jsonRequestMaker(path, withDc(dc).andThen(httpFunc))
   }
 
-  def responseStatusRequestMaker[A](path: String, httpFunc: HttpFunc)(body: Int => A)(implicit executionContext: ExecutionContext): Future[A] = {
-    genRequestMaker(path,httpFunc)(_.status)(body)
+  def responseStatusRequestMaker[A](path: String, httpFunc: HttpFunc)(body: StatusCode => A)(implicit executionContext: ExecutionContext): Future[A] = {
+    genRequestMaker(path,httpFunc)(res => body(res.status.intValue))
   }
 
-  def responseStatusDcRequestMaker[A](path: String, dc:Option[DatacenterId], httpFunc: HttpFunc)(body: Int => A)(implicit executionContext: ExecutionContext): Future[A] = {
+  def responseStatusDcRequestMaker[A](path: String, dc:Option[DatacenterId], httpFunc: HttpFunc)(body: StatusCode => A)(implicit executionContext: ExecutionContext): Future[A] = {
     responseStatusRequestMaker(path, withDc(dc).andThen(httpFunc))(body)
-  }
-
-  def stringRequestMaker[A](path: String, httpFunc: HttpFunc)(body: String => A)(implicit executionContext: ExecutionContext): Future[A] = {
-    genRequestMaker(path,httpFunc)(_.body)(body)
   }
 
   def erased[A](future:Future[JsResult[A]])(implicit executionContext: ExecutionContext): Future[A] = {
@@ -42,18 +33,15 @@ class ConsulRequestBasics(token: Option[String], client: WSClient) {
     }
   }
 
-  private def genRequestMaker[A,B](path: String, httpFunc: HttpFunc)(responseTransformer: WSResponse => B)(body: B => A)(implicit executionContext: ExecutionContext): Future[A] = {
-    Try((withToken(token) andThen httpFunc)(client.url(path))) match {
-      case Failure(exception) => Future.failed(exception)
-      case Success(resultF)   => resultF.map( responseTransformer andThen body )
-    }
+  private def genRequestMaker[A](path: String, httpFunc: HttpFunc)(responseTransformer: HttpResponse => A)(implicit executionContext: ExecutionContext): Future[A] = {
+    client(withToken(token).andThen(httpFunc)(Uri(path))).map(responseTransformer)
   }
 
-  private def withToken(token: Option[String]): RequestTransformer = {
-    token.map(t => (req: WSRequest) => req.withQueryString("token" -> t)).getOrElse(identity)
+  private def withToken(token: Option[String]): Uri => Uri = {
+    token.map(t => (_: Uri).withQuery("token" -> t)).getOrElse(identity)
   }
 
-  private def withDc(dc: Option[DatacenterId]): RequestTransformer = {
-    dc.map(v => (req: WSRequest) => req.withQueryString("dc" -> v.toString)).getOrElse(identity)
+  private def withDc(dc: Option[DatacenterId]): Uri => Uri = {
+    dc.map(v => (_: Uri).withQuery("dc" -> v.toString)).getOrElse(identity)
   }
 }

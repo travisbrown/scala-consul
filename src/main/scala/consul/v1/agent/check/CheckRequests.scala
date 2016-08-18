@@ -2,11 +2,12 @@ package consul.v1.agent.check
 
 import consul.v1.common.ConsulRequestBasics
 import consul.v1.common.Types.CheckId
-import play.api.http.Status
 import play.api.libs.json.{Writes, Json}
-import play.api.libs.ws.WSRequest
 
 import scala.concurrent.{ExecutionContext, Future}
+import spray.http.StatusCodes
+import spray.httpx.RequestBuilding
+import spray.httpx.PlayJsonSupport._
 
 case class Check(ID:CheckId,Name:String,Notes:Option[String],Script:Option[String],HTTP:Option[String],Interval:Option[String],TTL:Option[String])
 
@@ -49,12 +50,12 @@ object CheckRequests{
   def apply(basePath: String)(implicit executionContext: ExecutionContext, rb: ConsulRequestBasics): CheckRequests = new CheckRequests {
 
     def register(check: Check): Future[Boolean] = rb.responseStatusRequestMaker(
-      registerPath,_.put(Json.toJson(check))
-    )(_ == Status.OK)
+      registerPath, uri => RequestBuilding.Put(uri, Json.toJson(check))
+    )(_ == StatusCodes.OK)
 
     def deregister(checkId: CheckId): Future[Boolean] = rb.responseStatusRequestMaker(
-      fullPathFor(s"deregister/$checkId"),_.get()
-    )(_ == Status.OK)
+      fullPathFor(s"deregister/$checkId"), RequestBuilding.Get(_)
+    )(_ == StatusCodes.OK)
 
     def pass(checkId: CheckId,note:Option[String]): Future[Boolean] = functionForStatus("pass")(checkId,note)
 
@@ -65,8 +66,8 @@ object CheckRequests{
     private def functionForStatus(status:String) = (checkId: CheckId,note:Option[String]) =>
       rb.responseStatusRequestMaker(
         fullPathFor(s"$status/$checkId"),
-        (r:WSRequest) => note.map{ case note => r.withQueryString("note"->note) }.getOrElse( r ).get()
-      )(_ == Status.OK)
+        uri => RequestBuilding.Get(note.map{ case note => uri.withQuery("note"->note) }.getOrElse( uri ))
+      )(_ == StatusCodes.OK)
 
     private def fullPathFor(path: String) = s"$basePath/check/$path"
 

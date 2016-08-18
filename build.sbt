@@ -2,7 +2,7 @@ name := """scala-consul"""
 
 version := "1.1.0-SNAPSHOT"
 
-scalaVersion := "2.11.7"
+scalaVersion := "2.11.8"
 
 crossScalaVersions := Seq(scalaVersion.value)
 
@@ -11,13 +11,15 @@ scalacOptions ++= Seq(
   ,"-Xfuture" //, "-Xverify", "-Xcheck-null"
   ,"-Ybackend:GenBCode"
   ,"-Ydelambdafy:method"
+  ,"-Ywarn-unused-import"
 )
 
 resolvers += "Bintray Typesafe Repo" at "http://dl.bintray.com/typesafe/maven-releases/"
 
 libraryDependencies ++= Seq(
+  "com.typesafe.akka" %% "akka-actor" % "2.3.9",
   "com.typesafe.play" %% "play-json" % "2.4.3",
-  "com.typesafe.play" %% "play-ws"   % "2.4.3"
+  "io.spray" %% "spray-client" % "1.3.3"
 )
 
 organization := "com.codacy"

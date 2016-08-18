@@ -3,10 +3,12 @@ package consul.v1.agent.service
 import consul.v1.agent.service.LocalService.{apply => applied}
 import consul.v1.common.ConsulRequestBasics
 import consul.v1.common.Types._
-import play.api.http.Status
 import play.api.libs.json.{JsNull, Json, Writes}
 
 import scala.concurrent.{ExecutionContext, Future}
+import spray.http.StatusCodes
+import spray.httpx.RequestBuilding
+import spray.httpx.PlayJsonSupport._
 
 trait ServiceRequests {
   def register(localService: LocalService): Future[Boolean]
@@ -34,15 +36,15 @@ object ServiceRequests {
       lazy val params = Seq(("enable",enable.toString)) ++ reason.map("reason"->_)
       rb.responseStatusRequestMaker(
         fullPathFor(s"maintenance/$serviceID"),
-        _.withQueryString(params:_*).put(JsNull)
-      )(_ == Status.OK)
+        uri => RequestBuilding.Put(uri.withQuery(params:_*), JsNull)
+      )(_ == StatusCodes.OK)
     }
 
     def register(localService: LocalService): Future[Boolean] =
-      rb.responseStatusRequestMaker(fullPathFor("register"), _.put(Json.toJson(localService)))(_ == Status.OK)
+      rb.responseStatusRequestMaker(fullPathFor("register"), uri => RequestBuilding.Put(uri, Json.toJson(localService)))(_ == StatusCodes.OK)
 
     def deregister(serviceID: ServiceId): Future[Boolean] =
-      rb.responseStatusRequestMaker(fullPathFor(s"deregister/$serviceID"), _.get())(_ == Status.OK)
+      rb.responseStatusRequestMaker(fullPathFor(s"deregister/$serviceID"), RequestBuilding.Get(_))(_ == StatusCodes.OK)
 
     private def fullPathFor(path: String) = s"$basePath/service/$path"
 
