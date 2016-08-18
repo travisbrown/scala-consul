@@ -47,14 +47,7 @@ class Consul(address: InetAddress, port: Int = 8500, token: Option[String] = Non
 }
 
 object Consul {
-  def inApplication(address: InetAddress, port: Int = 8500, token: Option[String] = None)
+  def apply(address: InetAddress, port: Int = 8500, token: Option[String] = None)
                    (implicit executionContext: ExecutionContext, arf: ActorRefFactory): Consul =
     new Consul(address, port, token, sendReceive)
-
-  /*def standalone(address: InetAddress, port: Int = 8500, token: Option[String] = None)
-                (implicit executionContext: ExecutionContext): Consul = {
-    val builder = new AsyncHttpClientConfig.Builder()
-    val client = new NingWSClient(builder.build())
-    new Consul(address, port, token, client)
-  }*/
 }
