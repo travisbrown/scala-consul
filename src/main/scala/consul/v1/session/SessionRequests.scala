@@ -5,7 +5,9 @@ import consul.v1.common.Types._
 import play.api.libs.json.Json
 
 import scala.concurrent.{ExecutionContext, Future}
-import spray.http.{ HttpMethods, HttpRequest, StatusCodes }
+import spray.http.StatusCodes
+import spray.httpx.RequestBuilding
+import spray.httpx.PlayJsonSupport._
 
 trait SessionRequests {
 
@@ -35,31 +37,31 @@ object SessionRequests{
     def create(sessionDef: SessionDef,dc:Option[DatacenterId]): Future[SessionIDHolder] =
       rb.jsonDcRequestMaker[SessionIDHolder](
         createPath,dc,
-         uri => HttpRequest(HttpMethods.PUT, uri, entity = Json.stringify(Json.toJson(sessionDef)))
+         uri => RequestBuilding.Put(uri, Json.toJson(sessionDef))
       )
 
     def node(node:NodeId,dc:Option[DatacenterId]=Option.empty):Future[Seq[SessionInfo]] =
       rb.jsonDcRequestMaker[Seq[SessionInfo]](
-        fullPathFor(s"node/$node"),dc, uri => HttpRequest(HttpMethods.GET, uri)
+        fullPathFor(s"node/$node"),dc, RequestBuilding.Get(_)
       )
 
     def destroy(id:SessionId,dc:Option[DatacenterId]):Future[Boolean] = rb.responseStatusDcRequestMaker(
-      fullPathFor(s"destroy/$id"),dc, uri => HttpRequest(HttpMethods.PUT, uri, entity = "")
+      fullPathFor(s"destroy/$id"),dc, uri => RequestBuilding.Put(uri, "")
     )(_ == StatusCodes.OK)
 
     def list(dc:Option[DatacenterId]):Future[Seq[SessionInfo]] =
       rb.jsonDcRequestMaker[Seq[SessionInfo]](
-        listPath,dc, uri => HttpRequest(HttpMethods.GET, uri)
+        listPath,dc, RequestBuilding.Get(_)
       )
 
     def renew(id:SessionId,dc:Option[DatacenterId]=Option.empty):Future[Seq[SessionInfo]] =
       rb.jsonDcRequestMaker[Seq[SessionInfo]](
-        fullPathFor(s"renew/$id"),dc, uri => HttpRequest(HttpMethods.PUT, uri, entity = "")
+        fullPathFor(s"renew/$id"),dc, uri => RequestBuilding.Put(uri, "")
       )
 
     def info(id:SessionId,dc:Option[DatacenterId]=Option.empty):Future[Seq[SessionInfo]] =
       rb.jsonDcRequestMaker[Seq[SessionInfo]](
-        fullPathFor(s"info/$id"),dc, uri => HttpRequest(HttpMethods.GET, uri)
+        fullPathFor(s"info/$id"),dc, RequestBuilding.Get(_)
       )
 
     private lazy val createPath = fullPathFor("create")
